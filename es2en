@@ -1,0 +1,41 @@
+#! /bin/sh
+
+
+before="$(date +%s)"
+
+# Create incremental backup file
+now="$(date +%F@%R)"
+thebasename="$(basename $1)"
+mkdir -p backups/source
+cp $1 backups/source/$thebasename.$now.short.old
+echo "Saved" backups/source/$thebasename.$now.short.old
+
+# Translate it
+startt $1
+
+# sed '
+# /^<!-- \(.*\) -->$/N;s/^<!-- \(.*\) -->\n\1$/\1/
+# s/·//g
+# ' translate_me.$1 > final.$1
+
+#mv final.tmp $thebasename
+
+echo "Created " final.$thebasename
+
+mkdir -p backups/tmps
+mv *.tmp backups/tmps/
+#mv *.sed backups/tmps/
+echo "Done."
+
+mv new.$1 en.$1
+
+sed '
+/^<!--/s/(/_/g
+/^<!--/s/)/_/g
+s/<!--/\n[\/\/]:\ #/
+s/-->/\n/
+s/·//g
+' mobile.$1.html > md.$1.page
+
+vim -O $1 en.$1 -c "windo set scrollbind"
+vim -O mobile.$1.html /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt

@@ -1,0 +1,72 @@
+#! /bin/sh
+
+name="$(basename "$PWD")"
+#echo $name
+
+echo "Creating letter size."
+pandoc --latex-engine=xelatex \
+	--template=book.latex \
+	--toc \
+	--chapter \
+	--variable pagesize=letter \
+	-o output.pdf \
+	*.md
+
+#	-s \
+
+pdftk images/blank-letter.pdf output.pdf cat output temp.pdf
+pdftk images/cover-letter-small.pdf temp.pdf cat output $name-letter.pdf
+
+rm temp.pdf
+rm output.pdf
+
+#echo "Creating half-letter size."
+#pandoc --latex-engine=xelatex --template=halflettertemplate.latex --chapter --number-sections --toc -s -o output.pdf *.md
+
+#echo "Creating letter size."
+#pandoc --latex-engine=xelatex \
+#	--template=halflettertemplate.latex \
+#	--chapter  --number-sections \
+#	--toc \
+#	-s \
+#	-o output.pdf \
+#	*.md
+#
+#pdftk images/blank-half-letter.pdf output.pdf cat output temp.pdf
+#pdftk images/cover-half-letter.pdf temp.pdf cat output $name-halfletter.pdf
+
+#rm temp.pdf
+#rm output.pdf
+
+echo "Creating A4 size."
+pandoc --latex-engine=xelatex \
+	--variable pagesize=a4paper \
+	--template=book.latex \
+	--chapter \
+	--toc \
+	-o output.pdf \
+	*.md
+
+pdftk images/blank-a4.pdf output.pdf cat output temp.pdf
+pdftk images/cover-a4-small.pdf temp.pdf cat output $name-A4.pdf
+
+rm temp.pdf
+rm output.pdf
+
+echo "Creating epub."
+pandoc --latex-engine=xelatex \
+       --template=default.epub \
+       --epub-metadata=metadata.xml \
+       --epub-cover-image=images/cover.png \
+       --chapter \
+       --epub-chapter-level=2\
+       --toc \
+       -s \
+       -o \
+$name.epub *.md #title.txt
+
+echo "Creating HTML."
+pandoc -o $name.html \
+	*.md
+
+echo "Done."

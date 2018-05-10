@@ -1,0 +1,141 @@
+#! /bin/sh
+
+#rm *.swp
+#rm /media/steve/Cabinet/Dropbox/translations/*.swp
+
+before="$(date +%s)"
+
+thebasename="$(basename $1)"
+thedirname="$(dirname $1)"
+
+# if a mobile file exists, extract new entries to glossary
+if [ -f mobile.$1.html ]
+then
+	sed '/\t/!d' mobile.$1.html > sedtmp1.tmp
+	cat sedtmp1.tmp >> /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt
+fi
+
+# if a final file exists, extract new entries to glossary
+if [ -f final.$1 ]
+then
+	sed '/\t/!d' final.$1 > sedtmp2.tmp
+	cat sedtmp2.tmp >> /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt
+fi
+
+# Create sed script
+
+sed '/\t/!d
+/·/d
+s/\t\ /\t/g
+s/\t\t/\t/g
+s/\t$//g
+' /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt > /media/steve/Cabinet/Dropbox/translations/veryvery.tmp
+awk '!x[$0]++' /media/steve/Cabinet/Dropbox/translations/veryvery.tmp > /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt
+awk -F'\t' '{ print length($1), $0 | "sort -rn" }' /media/steve/Cabinet/Dropbox/translations/SpanishGlossary.txt > strip1.tmp
+
+echo "Now creating new sed script." # THIS AFFECTS THE SED SCRIPT, NOT THE OUTPUT FILE.
+
+sed '
+s/^[0-9]*//g 		# strip out all leading numbers
+s/^\ *//g		# strip leading spaces -- all lines have them due to the sort
+s/\//\\\//g		# make text slashes into literals
+s/\./\n/g		# strip periods
+s/\ /\\ /g			# make spaces into literals
+/^$/d			# delete blank lines
+s/^/\/^[¶§]\/\!\ s\/\\b/		# begins the substitution
+s/\t/\\b\/·/		# middle of the substitution; dot:·
+s/$/·\/g/			# concludes the substitution
+
+1 s/^/#!\ \/bin\/sed\ \-f\n\n/
+
+' strip1.tmp > pret2.sed
+
+echo "glossy.sed created."
+chmod +x pret2.sed
+
+# Prepare source content by commenting it
+#echo "1"
+sed '
+/[[:alpha:]]/ s/^/<\!\-\-\ /g				# /^[a-Za-z0-9«¿(<\-\"]/s/^/<\!\-\-\ /g
+/^<\!/s/$/\ \-\->/g
+' $1 > $1.0commented.tmp
+#echo "2"
+sed 's/\ \ \ */\ /g' $1.0commented.tmp > $1.commented.tmp
+
+# Translate source content
+# First, isolate tags, so they won't be translated
+#echo "3"
+sed '
+s/</\n¶/g
+s/>/¶\n/g
+s/^\ *//g
+s/\((http[^)]*)\)/\n§\1§\n/g
+' $1 > $1.detagged.tmp
+
+echo "Replacing. This may take a while."
+./pret2.sed $1.detagged.tmp > $1.inprocess.tmp
+
+
+sed '/^[¶§]/! s/_//g' $1.inprocess.tmp > $1.deunderlined.tmp  # has to go here so as not to break URLs
+# sed 's/^\/! s/_//g' $1.inprocess.tmp > $1.deunderlined.tmp  # has to go here so as not to break URLs
+
+sed '
+s/«/\"/g
+s/»/\"/g
+s/\"\./\.\"/g
+s/\"\,/\,\"/g
+s/”\./\.”/g
+s/”\,/\,”/g
+s/¿//g
+s/¡//g
+s/\ \ \ */\ /g
+' $1.deunderlined.tmp > $1.punct.tmp	# also to not break URLs
+
+# replace open tag
+sed '
+:a;N;$!ba;s/\n¶/</g
+' $1.punct.tmp > $1.retagged0.tmp
+	# s/^\/! @\*\*/</g
+
+# replace close tag	
+sed '
+:a;N;$!ba;s/¶\n/>/g
+' $1.retagged0.tmp > $1.retagged1.tmp
+# s/^\/! ¶\&\&\n/g
+# s/^\/! @?\*\?\*\*/<\&\&\n/>/g	# has to run separately until I understand these lines better
+#s/\*\&\&/>/g
+
+# put back end of URL in markdown
+sed '
+:a;N;$!ba;s/§\n//g
+' $1.retagged1.tmp > $1.retagged2.tmp
+
+# put back beginning of URL in markdown
+sed '
+:a;N;$!ba;s/\n§//g
+' $1.retagged2.tmp > $1.retagged.tmp
+
+sed 's/·//g' $1.retagged.tmp > new.$1
+
+# Splice comment source and translated source together
+
+paste -d "\n" $1.commented.tmp $1.retagged.tmp > $1.pasted.tmp
+sed '
+/^<!-- \(.*\) -->$/N;s/^<!-- \(.*\) -->\n\1$//
+/^$/d
+' $1.pasted.tmp > mobile.$1.html
+sed '
+#s/^<\!/\n<\!/g
+s/\ $//g
+' $1.pasted.tmp > $1.spaced.tmp
+uniq $1.spaced.tmp > $1.uniqued.tmp
+cp $1.uniqued.tmp $thedirname/longt_me.$thebasename
+
+after="$(date +%s)"
+elapsed_seconds="$(expr $after - $before)"
+thetime="$(date +%r)"
+# echo "startt created "longt_me.$1" in" $elapsed_seconds "seconds at" $thetime
+
+#mkdir -p tmps
+#mv *.tmp tmps/
+mv pret2.sed pret2.tmp
